@@ -192,12 +192,13 @@ namespace pcl
     template <typename Tuple> bool
     CountPlanarInlier::operator () (const Tuple &t)
     {
-      if (!isfinite (thrust::raw_reference_cast(thrust::get<0>(t)).x))
+      // NOTE: don't use thrust::raw_reference_cast in CUDA 8
+      if (!isfinite (thrust::get<0>(t).x))
         return (false);
 
-      return (std::abs (thrust::raw_reference_cast(thrust::get<0>(t)).x * coefficients.x +
-                    thrust::raw_reference_cast(thrust::get<0>(t)).y * coefficients.y +
-                    thrust::raw_reference_cast(thrust::get<0>(t)).z * coefficients.z + coefficients.w) < threshold);
+      return (std::fabs (thrust::get<0>(t).x * coefficients.x +
+            thrust::get<0>(t).y * coefficients.y +
+            thrust::get<0>(t).z * coefficients.z + coefficients.w) < threshold);
     }
 
     //////////////////////////////////////////////////////////////////////////
@@ -372,9 +373,8 @@ namespace pcl
 
       int nr_points = (int) indices_->size ();
 
-      if (!inliers_stencil)
-        inliers_stencil.reset (new Indices());
-      inliers_stencil->resize (nr_points);
+      IndicesPtr inliers(new Indices());
+      inliers->resize(nr_points);
 
       float4 coefficients;
       coefficients.x = ((float4)h[idx]).x;
@@ -386,9 +386,18 @@ namespace pcl
           make_zip_iterator (make_tuple (input_->points.begin (), indices_->begin ())),
           make_zip_iterator (make_tuple (input_->points.begin (), indices_->begin ())) + 
                              nr_points,
-          inliers_stencil->begin (), 
+          inliers->begin (), 
           CheckPlanarInlier (coefficients, threshold));
-      return nr_points - (int) thrust::count (inliers_stencil->begin (), inliers_stencil->end (), -1);
+
+      if (!inliers_stencil) {
+        inliers_stencil.reset (new Indices());
+      }
+      inliers_stencil->resize (nr_points);
+
+      // Copy data
+      typename Indices::iterator it = copy_if (inliers->begin (), inliers->end (), inliers_stencil->begin (), isInlier ());
+      inliers_stencil->resize (it - inliers_stencil->begin ());
+      return (int) inliers_stencil->size ();
     }
 
     template class SampleConsensusModelPlane<Device>;

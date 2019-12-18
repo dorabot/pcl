@@ -174,7 +174,12 @@ namespace pcl
 #if 1
       float3 centroid;
       sac_model_->selectWithinDistance (h, good_coeff, threshold_, inliers_stencil_, centroid);//inliers_stencil_);
-      std::cerr << "selected model " << good_coeff << std::endl;
+      float4 coefficients = h[good_coeff];
+      model_coefficients_.push_back(coefficients.x);
+      model_coefficients_.push_back(coefficients.y);
+      model_coefficients_.push_back(coefficients.z);
+      model_coefficients_.push_back(coefficients.w);
+      // std::cerr << "selected model " << good_coeff << std::endl;
 #endif
       return (true);
     }
